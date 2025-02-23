@@ -99,11 +99,15 @@ class VideoProcessor:
             ydl_opts = {
                 'quiet': True,
                 'no_warnings': False,
-                'cookiesfrombrowser': ('chrome',),  # Use Chrome cookies
                 'format': 'bestaudio/best',
                 'extract_audio': True,
                 'socket_timeout': 15,
-                'retries': 3
+                'no_check_certificate': True,  # Add this for potential SSL issues
+                'extractor_args': {
+                    'youtube': {
+                        'skip': ['webpage', 'dash', 'hls'],  # Skip unnecessary extraction steps
+                    }
+                }
             }
 
             # Get video info and available formats
