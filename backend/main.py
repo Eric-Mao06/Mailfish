@@ -1,12 +1,15 @@
 import os
 from typing import Dict, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 import google.generativeai as genai
 from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
+from services.video_finder import VideoFinder
+from services.process_video import VideoProcessor
+from services.voice_generator import VoiceGenerator
 
 load_dotenv()
 
@@ -34,8 +37,9 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-2.0-flash')
 
-# Store personality prompts for each person
+# Store personality prompts and voice IDs for each person
 personality_prompts: Dict[str, str] = {}
+voice_ids: Dict[str, str] = {}
 
 class PersonRequest(BaseModel):
     name: str
@@ -43,6 +47,10 @@ class PersonRequest(BaseModel):
 class ChatRequest(BaseModel):
     name: str
     message: str
+
+class TextToSpeechRequest(BaseModel):
+    name: str
+    text: str
 
 class PersonResponse(BaseModel):
     success: bool
@@ -99,38 +107,59 @@ async def create_clone(request: PersonRequest) -> PersonResponse:
             personality_prompt = model.generate_content(
                 f"""Based on this research about {request.name}, create a detailed system prompt that would help an AI model accurately simulate their personality, speech patterns, and knowledge:
 
-                Research: {research_text}
+                {research_text}
 
-                Create a system prompt that captures their:
-                1. Personality traits and speaking style
-                2. Knowledge domains and expertise
-                3. Notable opinions and viewpoints
-                4. Characteristic behaviors and mannerisms"""
+                Format the prompt to start with: 'You are {request.name}...'"""
             ).text
 
-            # Store the personality prompt
+            # Store personality prompt
             personality_prompts[request.name] = personality_prompt
 
-            return JSONResponse(
-                content={"success": True, "message": "Clone created successfully"},
-                headers={
-                    "Access-Control-Allow-Origin": "http://localhost:3000",
-                    "Access-Control-Allow-Methods": "POST, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                    "Access-Control-Allow-Credentials": "true",
-                }
+            # Initialize voice cloning services
+            video_finder = VideoFinder()
+            video_processor = VideoProcessor()
+            voice_generator = VoiceGenerator()
+
+            # Find videos of the person speaking
+            profile_info = {"name": request.name, "bio": research_text}
+            video_urls = video_finder.find_videos(profile_info)
+
+            if not video_urls:
+                return PersonResponse(
+                    success=True,
+                    message=f"Created AI clone for {request.name}, but couldn't find suitable videos for voice cloning"
+                )
+
+            # Process videos to extract audio
+            audio_path = video_processor.process_videos(video_urls, profile_info)
+
+            if not audio_path:
+                return PersonResponse(
+                    success=True,
+                    message=f"Created AI clone for {request.name}, but couldn't process videos for voice cloning"
+                )
+
+            # Generate voice clone
+            voice_result = voice_generator.generate_voice_clone(
+                audio_path=audio_path,
+                voice_name=request.name,
+                description=f"AI voice clone of {request.name}"
             )
 
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail="Request to Perplexity API timed out"
-        )
+            if voice_result and 'voice_id' in voice_result:
+                voice_ids[request.name] = voice_result['voice_id']
+                return PersonResponse(
+                    success=True,
+                    message=f"Successfully created AI clone and voice clone for {request.name}"
+                )
+            else:
+                return PersonResponse(
+                    success=True,
+                    message=f"Created AI clone for {request.name}, but voice cloning failed"
+                )
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error creating clone: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.options("/chat")
 async def chat_options():
@@ -183,6 +212,57 @@ async def chat(request: ChatRequest) -> ChatResponse:
             status_code=500,
             detail=f"Error generating response: {str(e)}"
         )
+
+@app.options("/text-to-speech")
+async def text_to_speech_options():
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
+
+@app.post("/text-to-speech")
+async def text_to_speech(request: TextToSpeechRequest):
+    try:
+        # Get voice ID for the requested name
+        if request.name not in voice_ids:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No voice found for {request.name}. Please create a clone first."
+            )
+        
+        voice_id = voice_ids[request.name]
+        
+        # Initialize voice generator
+        voice_generator = VoiceGenerator()
+        
+        # Generate speech
+        audio_data = voice_generator.text_to_speech(voice_id, request.text)
+        
+        if not audio_data:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to generate speech"
+            )
+        
+        # Return audio data with appropriate headers
+        return Response(
+            content=audio_data,
+            media_type="audio/mpeg",
+            headers={
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

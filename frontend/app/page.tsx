@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export default function Home() {
   const [personName, setPersonName] = useState("");
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isCloneReady, setIsCloneReady] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleCreateClone = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +42,44 @@ export default function Home() {
     }
   };
 
+  const generateSpeech = async (text: string) => {
+    try {
+      setIsSpeaking(true);
+      const response = await fetch('http://localhost:5000/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: personName, text })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate speech');
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = audioUrl;
+        await audioRef.current.play();
+      } else {
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        await audio.play();
+      }
+
+      audioRef.current.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+    } catch (error) {
+      console.error('Error generating speech:', error);
+      setIsSpeaking(false);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const messageInput = (e.target as HTMLFormElement).message as HTMLInputElement;
@@ -66,6 +106,9 @@ export default function Home() {
       
       const data = await response.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      
+      // Automatically generate speech for AI response
+      await generateSpeech(data.response);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -120,6 +163,15 @@ export default function Home() {
                       }`}
                     >
                       {msg.content}
+                      {msg.role === 'assistant' && (
+                        <button
+                          onClick={() => generateSpeech(msg.content)}
+                          disabled={isSpeaking}
+                          className="ml-2 text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+                        >
+                          {isSpeaking ? '🔊 Speaking...' : '🔈 Play'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
