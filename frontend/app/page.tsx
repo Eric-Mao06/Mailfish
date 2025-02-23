@@ -123,7 +123,7 @@ export default function Home() {
           <form onSubmit={handleCreateClone} className="bg-white p-6 rounded-lg shadow-md">
             <div className="mb-4">
               <label htmlFor="personName" className="block text-sm font-medium text-gray-700 mb-2">
-                Enter Person's Name
+                Enter Person&apos;s Name
               </label>
               <input
                 type="text"
@@ -146,7 +146,7 @@ export default function Home() {
         ) : (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="mb-4">
-              <h2 className="text-xl font-semibold mb-4">Chat with {personName}'s AI Clone</h2>
+              <h2 className="text-xl font-semibold mb-4">Chat with {personName}&apos;s AI Clone</h2>
               <div className="h-96 overflow-y-auto mb-4 p-4 border rounded-md">
                 {messages.map((msg, index) => (
                   <div
