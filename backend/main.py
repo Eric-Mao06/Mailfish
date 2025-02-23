@@ -13,7 +13,9 @@ from services.voice_generator import VoiceGenerator
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="Mailfish API",
+             description="API for voice cloning and chat",
+             version="1.0.0")
 
 # Configure CORS
 origins = [
@@ -59,6 +61,10 @@ class PersonResponse(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Mailfish API is running"}
 
 @app.options("/create-clone")
 async def create_clone_options():
