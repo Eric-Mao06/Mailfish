@@ -2,6 +2,8 @@
 
 import { useState, useRef } from "react";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
 export default function Home() {
   const [personName, setPersonName] = useState("");
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
@@ -15,7 +17,7 @@ export default function Home() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5000/create-clone', {
+      const response = await fetch(`${BACKEND_URL}/create-clone`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,7 +47,7 @@ export default function Home() {
   const generateSpeech = async (text: string) => {
     try {
       setIsSpeaking(true);
-      const response = await fetch('http://localhost:5000/text-to-speech', {
+      const response = await fetch(`${BACKEND_URL}/text-to-speech`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,7 +93,7 @@ export default function Home() {
     messageInput.value = '';
     
     try {
-      const response = await fetch('http://localhost:5000/chat', {
+      const response = await fetch(`${BACKEND_URL}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

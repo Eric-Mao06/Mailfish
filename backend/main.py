@@ -19,6 +19,7 @@ app = FastAPI()
 origins = [
     "http://localhost:3000",
     "http://localhost:5000",
+    "https://frontend-production-f346.up.railway.app"
 ]
 
 app.add_middleware(
@@ -266,4 +267,5 @@ async def text_to_speech(request: TextToSpeechRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="localhost", port=5000, log_level="debug")
+    port = int(os.getenv("PORT", 5000))
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
