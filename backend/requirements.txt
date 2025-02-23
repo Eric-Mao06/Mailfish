@@ -11,3 +11,4 @@ Pillow[webp,tiff,icns]>=10.1.0
 numpy>=1.26.0
 ffmpeg-python>=0.2.0
 pytubefix
+exa-py

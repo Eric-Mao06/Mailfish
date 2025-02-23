@@ -2,22 +2,15 @@ import os
 import requests
 import json
 import re
+from exa_py import Exa
 
 class VideoFinder:
     def __init__(self):
-        self.api_key = os.getenv("PERPLEXITY_API_KEY")
-        if not self.api_key:
-            raise ValueError("PERPLEXITY_API_KEY environment variable is not set")
-            
-        self.headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-            "authorization": f"Bearer {self.api_key}"
-        }
+        self.exa = Exa(api_key="32ec3504-0167-4eee-9ffc-f0a7c8db1ec5")
 
     def find_videos(self, profile_info):
         """
-        Uses Perplexity to search for videos of the person speaking
+        Uses Exa to search for videos of the person speaking
         Args:
             profile_info (dict): Dictionary containing name and bio from Twitter
         Returns:
@@ -26,16 +19,20 @@ class VideoFinder:
         name = profile_info.get("name")
         bio = profile_info.get("bio", "")
         
-        prompt = f"Find YouTube videos of {name} ({bio}) speaking. Requirements:  Videos must be primarily focused on {name} himself speaking directly Do not include videos of other people speaking about {name}  Maximum video length: 15 minutes  High audio quality with minimal background noise  No overlapping voices or music  For each video found, provide: The YouTube URL  return only youtube URL and nothing else"
+        prompt = f"Videos of {name} speaking. Requirements:  Videos must be primarily focused on {name} himself speaking directly Do not include videos of other people speaking about {name}  Maximum video length: 15 minutes  High audio quality with minimal background noise  No overlapping voices or music."
         
         print(f"\nSearching for videos with query: {prompt}\n")
         
         try:
-            response = self._query_perplexity(prompt)
+            result = self.exa.search_and_contents(
+                prompt,
+                text=True,
+                include_domains=["youtube.com"],
+                num_results=3
+            )
             
             # Extract URLs from the response
-            # The response might be a plain text with URLs, so we'll extract them
-            urls = re.findall(r'https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+', response)
+            urls = [item.url for item in result.results]
             
             if not urls:
                 print("No suitable videos found")
@@ -45,34 +42,5 @@ class VideoFinder:
             return list(set(urls))
             
         except Exception as e:
-            print(f"\nError making request to Perplexity API: {str(e)}")
+            print(f"\nError making request to Exa API: {str(e)}")
             raise
-
-    def _query_perplexity(self, prompt):
-        """
-        Query the Perplexity API
-        Args:
-            prompt (str): The prompt to send to Perplexity
-        Returns:
-            str: The response from Perplexity
-        """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-        
-        data = {
-            "model": "sonar-reasoning-pro",  # Updated model name
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        
-        response = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers=headers,
-            json=data
-        )
-        
-        if response.status_code != 200:
-            raise Exception(f"Perplexity API error: {response.status_code} - {response.text}")
-            
-        return response.json()['choices'][0]['message']['content']
