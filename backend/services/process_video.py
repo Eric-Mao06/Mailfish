@@ -177,22 +177,18 @@ class VideoProcessor:
             return None
 
     def process_videos(self, video_urls, profile_info):
-        """Process multiple videos to extract audio in parallel"""
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            future_to_url = {
-                executor.submit(self._download_video, url): url 
-                for url in video_urls
-            }
-            
-            audio_paths = []
-            for future in as_completed(future_to_url):
-                url = future_to_url[future]
-                try:
-                    audio_path = future.result()
-                    if audio_path:
-                        audio_paths.append(audio_path)
-                except Exception as e:
-                    print(f"Error processing {url}: {str(e)}")
-                    continue
+        """Process videos sequentially to extract audio"""
+        audio_paths = []
+        
+        for url in video_urls:
+            try:
+                # Add a small delay between requests to avoid rate limiting
+                time.sleep(2)
+                audio_path = self._download_video(url)
+                if audio_path:
+                    audio_paths.append(audio_path)
+            except Exception as e:
+                print(f"Error processing {url}: {str(e)}")
+                continue
                     
         return audio_paths[0] if audio_paths else None
