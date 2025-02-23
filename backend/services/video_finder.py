@@ -6,7 +6,10 @@ from exa_py import Exa
 
 class VideoFinder:
     def __init__(self):
-        self.exa = Exa(api_key="32ec3504-0167-4eee-9ffc-f0a7c8db1ec5")
+        self.api_key = os.getenv("EXA_API_KEY")
+        if not self.api_key:
+            raise ValueError("EXA_API_KEY environment variable is not set")
+        self.exa = Exa(api_key=self.api_key)
 
     def find_videos(self, profile_info):
         """
